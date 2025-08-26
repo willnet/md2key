@@ -60,8 +60,8 @@ module Md2key
           prefix = "sequenceDiagram\n"
           draw_diagram = true
         else
-          Highlight.pbcopy_highlighted_code(code)
-          insert_code_background
+          Highlight.pbcopy_carbon_now(code)
+          #insert_code_background
           activate_last_slide
           paste_clipboard
         end
