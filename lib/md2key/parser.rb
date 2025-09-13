@@ -153,7 +153,9 @@ module Md2key
         Redcarpet::Render::XHTML.new(
           escape_html: true,
         ),
-        fenced_code_blocks: true, tables: true
+        fenced_code_blocks: true,
+        tables: true,
+        no_intra_emphasis: true
       )
       redcarpet.render(markdown)
     end
