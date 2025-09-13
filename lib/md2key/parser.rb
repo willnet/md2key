@@ -117,6 +117,7 @@ module Md2key
     end
 
     def to_xhtml(markdown)
+      markdown = strip_comments(markdown)
       redcarpet = Redcarpet::Markdown.new(
         Redcarpet::Render::XHTML.new(
           escape_html: true,
@@ -124,6 +125,50 @@ module Md2key
         fenced_code_blocks: true, tables: true
       )
       redcarpet.render(markdown)
+    end
+
+    # Remove comment lines from markdown before parsing.
+    # - Lines starting with '//' (after optional indentation) are treated as comments
+    # - HTML comments <!-- ... --> are removed, including multi-line blocks
+    # - Comments inside fenced code blocks are preserved
+    def strip_comments(markdown)
+      in_fence = false
+      fence_delim = nil # "```" or "~~~"
+      in_html_comment = false
+
+      filtered = markdown.each_line.map do |line|
+        stripped = line.lstrip
+
+        if in_fence
+          # End of fenced code block
+          if fence_delim && stripped.start_with?(fence_delim)
+            in_fence = false
+          end
+          line
+        else
+          # Start of fenced code block (keep as-is)
+          if stripped.start_with?('```') || stripped.start_with?('~~~')
+            in_fence = true
+            fence_delim = stripped.start_with?('```') ? '```' : '~~~'
+            line
+          else
+            # HTML comment handling (remove entire blocks)
+            if in_html_comment
+              in_html_comment = false if stripped.include?('-->')
+              ''
+            elsif stripped.start_with?('<!--')
+              in_html_comment = !stripped.include?('-->')
+              ''
+            # Line comments starting with //
+            elsif stripped.start_with?('//')
+              ''
+            else
+              line
+            end
+          end
+        end
+      end
+      filtered.join
     end
   end
 end
