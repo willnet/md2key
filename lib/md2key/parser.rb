@@ -69,16 +69,33 @@ module Md2key
           end
           slide.table = Nodes::Table.new(rows, columns, row_data)
         when 'p'
+          # Build a single line from paragraph content, expanding links to "label (url)"
+          text_parts = []
           node.children.each do |child|
-            if child.is_a?(Oga::XML::Element) && child.name == 'img'
-              slide.image = child.attribute('src').value
-              next
-            elsif child.is_a?(Oga::XML::Text) && child.text.start_with?('^ ')
-              slide.note = child.text.sub(/^\^ /, '')
-              next
+            if child.is_a?(Oga::XML::Element)
+              case child.name
+              when 'img'
+                slide.image = child.attribute('src').value
+                next
+              when 'a'
+                label = child.text
+                href = child.attribute('href')&.value
+                text_parts << (href && !href.empty? ? "#{label} (#{href})" : label)
+              else
+                t = child.text
+                text_parts << t unless t.nil? || t.strip.empty?
+              end
+            elsif child.is_a?(Oga::XML::Text)
+              if child.text.start_with?('^ ')
+                slide.note = child.text.sub(/^\^ /, '')
+                next
+              end
+              t = child.text
+              text_parts << t unless t.nil? || t.strip.empty?
             end
-            slide.lines << Nodes::Line.new(child.text)
           end
+          para_text = text_parts.join(' ').strip
+          slide.lines << Nodes::Line.new(para_text) unless para_text.empty?
         when 'pre'
           node.children.each do |child|
             next if !child.is_a?(Oga::XML::Element) || child.name != 'code'
@@ -102,16 +119,30 @@ module Md2key
         next unless li_node.is_a?(Oga::XML::Element)
         next if li_node.name != 'li'
 
+        parts = []
+        nested = []
         li_node.children.each do |node|
           case node
           when Oga::XML::Text
-            text = node.text.strip
-            lines << Nodes::Line.new(text, indent) unless text.empty?
+            t = node.text.strip
+            parts << t unless t.empty?
           when Oga::XML::Element
-            next if node.name != 'ul'
-            lines.concat(li_lines(node, indent: indent + 1))
+            if node.name == 'ul' || node.name == 'ol'
+              nested.concat(li_lines(node, indent: indent + 1))
+            elsif node.name == 'a'
+              label = node.text
+              href = node.attribute('href')&.value
+              parts << (href && !href.empty? ? "#{label} (#{href})" : label)
+            else
+              t = node.text.strip
+              parts << t unless t.empty?
+            end
           end
         end
+
+        text = parts.join(' ').strip
+        lines << Nodes::Line.new(text, indent) unless text.empty?
+        lines.concat(nested)
       end
       lines
     end
