@@ -8,16 +8,17 @@ require 'redcarpet'
 module Md2key
   class Parser
     # @param  [String] markdown
+    # @param  [String, nil] base_dir - Base directory to resolve relative image paths
     # @return [Md2key::Nodes::Presentation] ast
-    def parse(markdown)
-      slides = parse_slides(markdown)
+    def parse(markdown, base_dir: nil)
+      slides = parse_slides(markdown, base_dir: base_dir)
       cover  = slides.delete_at(0)
       Nodes::Presentation.new(cover, slides)
     end
 
     private
 
-    def parse_slides(markdown)
+    def parse_slides(markdown, base_dir: nil)
       slides = []
       slide  = Nodes::Slide.new
 
@@ -75,7 +76,8 @@ module Md2key
             if child.is_a?(Oga::XML::Element)
               case child.name
               when 'img'
-                slide.image = child.attribute('src').value
+                src = child.attribute('src')&.value
+                slide.image = absolutize_image_src(src, base_dir)
                 next
               when 'a'
                 label = child.text
@@ -158,6 +160,16 @@ module Md2key
         no_intra_emphasis: true
       )
       redcarpet.render(markdown)
+    end
+
+    # Turn a relative image path into an absolute path using base_dir.
+    # Leaves URLs (http/https/etc.) and absolute paths untouched.
+    def absolutize_image_src(src, base_dir)
+      return nil if src.nil? || src.strip.empty?
+      # URL scheme
+      return src if src =~ %r{\A[a-zA-Z][a-zA-Z0-9+.-]*://}
+      return src if base_dir.nil?
+      File.expand_path(src, base_dir)
     end
 
     # Remove comment lines from markdown before parsing.

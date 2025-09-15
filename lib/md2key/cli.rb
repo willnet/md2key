@@ -13,7 +13,9 @@ module Md2key
 
       markdown = File.read(path)
       config = ConfigLoader.load('~/.md2key', './.md2key')
-      ast = Parser.new.parse(markdown)
+      # Resolve relative image paths during parsing using markdown's directory
+      base_dir = File.dirname(File.absolute_path(path))
+      ast = Parser.new.parse(markdown, base_dir: base_dir)
       Renderer.new(config).render!(ast)
     end
 
@@ -49,5 +51,6 @@ module Md2key
         return super(*args)
       end
     end
+    
   end
 end
